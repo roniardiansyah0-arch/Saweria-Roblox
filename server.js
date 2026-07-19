@@ -1,41 +1,20 @@
 require("dotenv").config();
 
 const express = require("express");
-const fs = require("fs");
+const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 
 app.use(express.json());
 
-const DATA_FILE = "./donations.json";
 
 // =============================
-// LOAD DATA DONASI
+// SUPABASE
 // =============================
-function loadDonations() {
-    if (!fs.existsSync(DATA_FILE)) {
-        return [];
-    }
-
-    const data = fs.readFileSync(DATA_FILE, "utf8");
-
-    try {
-        return JSON.parse(data);
-    } catch {
-        return [];
-    }
-}
-
-
-// =============================
-// SAVE DATA DONASI
-// =============================
-function saveDonations(data) {
-    fs.writeFileSync(
-        DATA_FILE,
-        JSON.stringify(data, null, 2)
-    );
-}
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
+);
 
 
 // =============================
@@ -57,7 +36,7 @@ app.get("/webhook", (req, res) => {
 // =============================
 // WEBHOOK SAWERIA
 // =============================
-app.post("/webhook", (req, res) => {
+app.post("/webhook", async (req, res) => {
 
     console.log("========== DONASI MASUK ==========");
     console.log(JSON.stringify(req.body, null, 2));
@@ -67,21 +46,25 @@ app.post("/webhook", (req, res) => {
     const donation = req.body;
 
 
-    const data = loadDonations();
+    const { data, error } = await supabase
+        .from("donations")
+        .insert([
+            {
+                name: donation.donator_name || "Anonymous",
+                amount: donation.amount_raw || 0,
+                message: donation.message || ""
+            }
+        ]);
 
 
-    data.push({
-        name: donation.donator_name || "Anonymous",
-        amount: donation.amount_raw || 0,
-        message: donation.message || "",
-        date: new Date().toISOString()
-    });
+    if (error) {
+        console.log("SUPABASE ERROR:");
+        console.log(error);
+        return res.status(500).send("Database Error");
+    }
 
 
-    saveDonations(data);
-
-
-    console.log("Donasi tersimpan!");
+    console.log("Donasi masuk Supabase ✅");
 
     res.status(200).send("OK");
 });
@@ -90,17 +73,23 @@ app.post("/webhook", (req, res) => {
 // =============================
 // TOP CASH UNTUK ROBLOX
 // =============================
-app.get("/topcash", (req, res) => {
-
-    const data = loadDonations();
+app.get("/topcash", async (req, res) => {
 
 
-    const ranking = data
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 10);
+    const { data, error } = await supabase
+        .from("donations")
+        .select("*")
+        .order("amount", { ascending: false })
+        .limit(10);
 
 
-    res.json(ranking);
+    if (error) {
+        console.log(error);
+        return res.status(500).json(error);
+    }
+
+
+    res.json(data);
 });
 
 
@@ -108,6 +97,7 @@ app.get("/topcash", (req, res) => {
 // SERVER
 // =============================
 const PORT = process.env.PORT || 3000;
+
 
 app.listen(PORT, () => {
     console.log(`Server berjalan di port ${PORT}`);
