@@ -11,6 +11,11 @@ app.get("/", (req, res) => {
     res.send("Saweria Server Berjalan!");
 });
 
+// Test Webhook
+app.get("/webhook", (req, res) => {
+    res.send("Webhook aktif!");
+});
+
 // Webhook Saweria
 app.post("/webhook", (req, res) => {
 
