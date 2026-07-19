@@ -20,7 +20,7 @@ app.get("/webhook", (req, res) => {
 app.post("/webhook", (req, res) => {
 
     console.log("========== DONASI MASUK ==========");
-    console.log(req.body);
+    console.log(JSON.stringify(req.body, null, 2));
     console.log("=================================");
 
     res.status(200).send("OK");
