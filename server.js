@@ -51,9 +51,11 @@ app.get("/topcash", async (req, res) => {
         grouped[finalName] = (grouped[finalName] || 0) + Number(d.amount || 0);
     });
 
-    const leaderboard = Object.keys(grouped).map(name => ({
+  const leaderboard = Object.keys(grouped).map(name => ({
         name: name,
-        amount: grouped[name]
+        donor_name: name,
+        amount: grouped[name],
+        total: grouped[name]
     })).sort((a,b) => b.amount - a.amount).slice(0, 10);
 
     res.json(leaderboard);
