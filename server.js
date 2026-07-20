@@ -10,7 +10,6 @@ app.use(express.urlencoded({ extended: true }));
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// WEBHOOK DARI SAWERIA
 app.post('/webhook', async (req, res) => {
     console.log("Webhook masuk:", req.body);
     try {
@@ -25,7 +24,6 @@ app.post('/webhook', async (req, res) => {
         let robloxName = "";
         let cleanMessage = messageRaw;
 
-        // 1. Cek @Username dulu (prioritas)
         if (messageRaw.includes("@")) {
             const m = messageRaw.match(/@([A-Za-z0-9_]{3,20})/);
             if (m) {
@@ -33,26 +31,33 @@ app.post('/webhook', async (req, res) => {
                 cleanMessage = messageRaw.replace(m[0], "").trim();
             }
         }
-        // 2. Kalau pesan cuma 1 kata (kayak "Ronnsyh") anggap itu username
         if (!robloxName && /^[A-Za-z0-9_]{3,20}$/.test(messageRaw)) {
             robloxName = messageRaw;
             cleanMessage = "";
         }
-        // 3. Fallback pakai nama donatur Saweria
         if (!robloxName) {
             robloxName = donatorRaw.replace(/[^A-Za-z0-9_]/g, '').substring(0, 20);
         }
         if (!robloxName) return res.status(200).send("no name");
 
-        console.log(`-> Donasi valid: ${robloxName} Rp ${amount} | pesan: "${cleanMessage}" (dari ${donatorRaw})`);
+        console.log(`-> Donasi valid: ${robloxName} Rp ${amount} | pesan: "${cleanMessage}"`);
 
-        await supabase.from('donations').insert([{
-            name: robloxName,
-            amount: amount,
-            message: cleanMessage,
-            donator_name: donatorRaw
-        }]);
+        const { data: inserted, error: insertError } = await supabase
+           .from('donations')
+           .insert([{
+                name: robloxName,
+                amount: amount,
+                message: cleanMessage,
+                donator_name: donatorRaw
+            }])
+           .select();
 
+        if (insertError) {
+            console.error("INSERT ERROR:", insertError);
+            return res.status(200).send("insert error");
+        }
+
+        console.log("INSERT OK:", inserted);
         res.status(200).send("ok");
     } catch (e) {
         console.error(e);
@@ -60,15 +65,17 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
-// TOP 10 LEADERBOARD
 app.get('/topcash', async (req, res) => {
     const { data, error } = await supabase
-       .from('donations')
-       .select('name, amount, message, created_at')
-       .order('created_at', { ascending: false })
-       .limit(1000);
+      .from('donations')
+      .select('name, amount, message, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1000);
 
-    if (error) return res.json([]);
+    if (error) {
+        console.error("TOPCASH ERROR:", error);
+        return res.json([]);
+    }
 
     const grouped = {};
     data.forEach(d => {
@@ -79,24 +86,24 @@ app.get('/topcash', async (req, res) => {
     });
 
     const sorted = Object.entries(grouped)
-       .map(([name, v]) => ({ name, amount: v.amount, message: v.message, last_at: v.last_at }))
-       .sort((a, b) => b.amount - a.amount)
-       .slice(0, 10);
+      .map(([name, v]) => ({ name, amount: v.amount, message: v.message, last_at: v.last_at }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
 
     res.json(sorted);
 });
 
-// BROADCAST REALTIME
 app.get('/latest', async (req, res) => {
-    const { data } = await supabase
-       .from('donations')
-       .select('*')
-       .order('created_at', { ascending: false })
-       .limit(5);
+    const { data, error } = await supabase
+      .from('donations')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5);
+    if (error) console.error("LATEST ERROR:", error);
     res.json(data || []);
 });
 
-app.get('/', (req, res) => res.send('Saweria Roblox Active - Ronnsyh V5 FINAL'));
+app.get('/', (req, res) => res.send('Saweria Roblox Active - Ronnsyh V6 FINAL'));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Server jalan di ${PORT}`));
