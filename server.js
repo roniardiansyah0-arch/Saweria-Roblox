@@ -43,14 +43,13 @@ app.post('/webhook', async (req, res) => {
         console.log(`-> Donasi valid: ${robloxName} Rp ${amount} | pesan: "${cleanMessage}"`);
 
         const { data: inserted, error: insertError } = await supabase
-           .from('donations')
-           .insert([{
+          .from('donations')
+          .insert([{
                 name: robloxName,
                 amount: amount,
-                message: cleanMessage,
-                donator_name: donatorRaw
+                message: cleanMessage
             }])
-           .select();
+          .select();
 
         if (insertError) {
             console.error("INSERT ERROR:", insertError);
@@ -67,10 +66,10 @@ app.post('/webhook', async (req, res) => {
 
 app.get('/topcash', async (req, res) => {
     const { data, error } = await supabase
-      .from('donations')
-      .select('name, amount, message, created_at')
-      .order('created_at', { ascending: false })
-      .limit(1000);
+     .from('donations')
+     .select('name, amount, message, created_at')
+     .order('created_at', { ascending: false })
+     .limit(1000);
 
     if (error) {
         console.error("TOPCASH ERROR:", error);
@@ -86,24 +85,24 @@ app.get('/topcash', async (req, res) => {
     });
 
     const sorted = Object.entries(grouped)
-      .map(([name, v]) => ({ name, amount: v.amount, message: v.message, last_at: v.last_at }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10);
+     .map(([name, v]) => ({ name, amount: v.amount, message: v.message, last_at: v.last_at }))
+     .sort((a, b) => b.amount - a.amount)
+     .slice(0, 10);
 
     res.json(sorted);
 });
 
 app.get('/latest', async (req, res) => {
     const { data, error } = await supabase
-      .from('donations')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(5);
+     .from('donations')
+     .select('*')
+     .order('created_at', { ascending: false })
+     .limit(5);
     if (error) console.error("LATEST ERROR:", error);
     res.json(data || []);
 });
 
-app.get('/', (req, res) => res.send('Saweria Roblox Active - Ronnsyh V6 FINAL'));
+app.get('/', (req, res) => res.send('Saweria Roblox Active - Ronnsyh V7 FIX'));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Server jalan di ${PORT}`));
