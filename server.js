@@ -1,85 +1,87 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const { createClient } = require("@supabase/supabase-js");
+const express = require('express');
+const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_KEY
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-app.get("/", (req, res) => res.send("Saweria Server Berjalan! Ronnsyh Edition 🔥"));
-app.get("/webhook", (req, res) => res.send("Webhook aktif!"));
+// WEBHOOK DARI SAWERIA
+app.post('/webhook', async (req, res) => {
+    console.log("Webhook masuk:", req.body);
+    
+    try {
+        const body = req.body;
+        const donatorRaw = (body.donator || body.donator_name || body.donatorName || "").trim();
+        const messageRaw = (body.message || body.msg || "").trim();
+        const amountRaw = body.amount_raw || body.amount || body.nominal || 0;
+        
+        // Bersihin nominal "Rp 1.000" jadi 1000
+        let amount = parseInt(String(amountRaw).replace(/[^0-9]/g, '')) || 0;
+        if (amount === 0) amount = 1000;
 
-// WEBHOOK - support /webhook dan /webhook/saweria biar gak salah
-app.post(["/webhook", "/webhook/saweria"], async (req, res) => {
-    console.log("========== DONASI MASUK ==========");
-    console.log(JSON.stringify(req.body, null, 2));
-
-    const donation = req.body;
-    if (donation.id === "00000000-0000-0000-0000-000000000000" || donation.donator_name === "Someguy") {
-        return res.status(200).send("OK Test");
-    }
-
-    const { error } = await supabase.from("donations").insert([{
-        name: donation.donator_name || "Anonymous",
-        amount: donation.amount_raw || 0,
-        message: donation.message || ""
-    }]);
-
-    if (error) {
-        console.error(error);
-        return res.status(500).send("Database Error");
-    }
-    console.log("Masuk Supabase ✅");
-    res.status(200).send("OK");
-});
-
-// INI YANG DIBACA ROBLOX - AUTO DETECT USERNAME (FIX)
-app.get("/topcash", async (req, res) => {
-    const { data, error } = await supabase.from("donations").select("*").limit(1000);
-    if (error) return res.status(500).json(error);
-
-    const grouped = {};
-    data.forEach(d => {
-        let finalName = (d.name || "Anonymous").trim();
-        const msg = (d.message || "").trim();
-
-        if (msg) {
-            // 1. Format "Username: Ronnsyh"
-            const m = msg.match(/Username:\s*([a-zA-Z0-9_]{3,20})/i);
-            if (m) {
-                finalName = m[1];
-            }
-            // 2. Format cuma "Ronnsyh" doang di pesan
-            else if (/^[a-zA-Z0-9_]{3,20}$/.test(msg)) {
-                finalName = msg;
-            }
+        // LOGIC CARI USERNAME ROBLOX
+        let robloxName = "";
+        if (/^[A-Za-z0-9_]{3,20}$/.test(messageRaw)) {
+            // Kalau pesan cuma 1 kata = itu username
+            robloxName = messageRaw;
+        } else if (messageRaw.includes("@")) {
+            // Kalau ada @Ronnsyh di pesan
+            const m = messageRaw.match(/@([A-Za-z0-9_]{3,20})/);
+            if (m) robloxName = m[1];
+        }
+        
+        // Kalau masih kosong, pake nama donatur
+        if (!robloxName) {
+            robloxName = donatorRaw.replace(/[^A-Za-z0-9_]/g, '').substring(0, 20);
         }
 
-        grouped[finalName] = (grouped[finalName] || 0) + Number(d.amount || 0);
+        if (!robloxName) return res.status(200).send("no name");
+
+        console.log(`-> Donasi valid: ${robloxName} Rp ${amount} (dari ${donatorRaw} | pesan: ${messageRaw})`);
+
+        await supabase.from('donations').insert([{
+            name: robloxName,
+            amount: amount,
+            message: robloxName
+        }]);
+
+        res.status(200).send("ok");
+    } catch (e) {
+        console.error(e);
+        res.status(200).send("error but ok");
+    }
+});
+
+// BUAT ROBLOX BACA
+app.get('/topcash', async (req, res) => {
+    const { data, error } = await supabase
+        .from('donations')
+        .select('name, amount');
+
+    if (error) return res.json([]);
+
+    // Group by name & sum
+    const grouped = {};
+    data.forEach(d => {
+        const name = d.name;
+        if (!grouped[name]) grouped[name] = 0;
+        grouped[name] += d.amount;
     });
 
-    const leaderboard = Object.keys(grouped).map(name => ({
-        name: name,
-        donor_name: name,
-        amount: grouped[name],
-        total: grouped[name]
-    })).sort((a,b) => b.amount - a.amount).slice(0, 10);
+    const sorted = Object.entries(grouped)
+        .map(([name, amount]) => ({ name, amount }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 10);
 
-    res.json(leaderboard);
+    res.json(sorted);
 });
 
-// biar link lama tetep jalan
-app.get("/donations", (req,res) => res.redirect("/topcash"));
-app.get("/latest", async (req,res) => {
-    const { data } = await supabase.from("donations").select("*").order("id",{ascending:false}).limit(1);
-    res.json(data);
-});
+app.get('/', (req, res) => res.send('Saweria Roblox Active'));
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Server jalan di ${PORT}`));
