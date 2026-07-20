@@ -66,28 +66,30 @@ app.post('/webhook', async (req, res) => {
 
 app.get('/topcash', async (req, res) => {
     const { data, error } = await supabase
-     .from('donations')
-     .select('name, amount, message, created_at')
-     .order('created_at', { ascending: false })
-     .limit(1000);
+    .from('donations')
+    .select('name, amount, message, created_at')
+    .order('created_at', { ascending: false })
+    .limit(1000);
 
-    if (error) {
-        console.error("TOPCASH ERROR:", error);
-        return res.json([]);
-    }
+    if (error) return res.json([]);
 
     const grouped = {};
     data.forEach(d => {
-        if (!grouped[d.name]) {
-            grouped[d.name] = { amount: 0, message: d.message, last_at: d.created_at };
+        const key = d.name.toLowerCase();
+        if (!grouped[key]) {
+            grouped[key] = { name: d.name, amount: 0, message: d.message, last_at: d.created_at };
         }
-        grouped[d.name].amount += d.amount;
+        grouped[key].amount += d.amount;
+        // update message ke yang terbaru
+        if (new Date(d.created_at) > new Date(grouped[key].last_at)) {
+            grouped[key].last_at = d.created_at;
+            grouped[key].message = d.message;
+        }
     });
 
-    const sorted = Object.entries(grouped)
-     .map(([name, v]) => ({ name, amount: v.amount, message: v.message, last_at: v.last_at }))
-     .sort((a, b) => b.amount - a.amount)
-     .slice(0, 10);
+    const sorted = Object.values(grouped)
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 10);
 
     res.json(sorted);
 });
