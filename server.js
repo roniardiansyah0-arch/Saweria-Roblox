@@ -114,14 +114,14 @@ app.get('/topcash', async (req, res) => {
         }
     });
 
-    const sorted = Object.values(grouped).sort((a, b) => b.amount - a.amount).slice(0, 10);
+    const sorted = Object.values(grouped).sort((a, b) => b.amount - a.amount).slice(0, 20);
     res.json(sorted);
 });
 
 app.get('/latest', async (req, res) => {
     const owner = getOwner(req);
     const { data, error } = await supabaseRetry(() =>
-        supabase.from('donations').select('*').eq('owner', owner).order('created_at', { ascending: false }).limit(5)
+        supabase.from('donations').select('*').eq('owner', owner).order('created_at', { ascending: false }).limit(10)
     );
     if (error) {
         console.error("LATEST ERROR:", error);
