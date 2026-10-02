@@ -38,8 +38,8 @@ app.post('/webhook', async (req, res) => {
         const messageRaw = (body.message || body.msg || "").trim();
         const amountRaw = body.amount_raw || body.amount || body.nominal || 0;
 
-        let amount = parseInt(String(amountRaw).replace(/[^0-9]/g, '')) || 0;
-        if (amount === 0) amount = 1000;
+        let amount = parseInt(String(amountRaw).replace(/[^0-9]/g, ''), 10) || 0;
+        if (amount === 0) amount = 1000; // 1000 tetap kehitung
 
         let robloxName = "";
         let cleanMessage = messageRaw;
@@ -56,9 +56,9 @@ app.post('/webhook', async (req, res) => {
             cleanMessage = "";
         }
         if (!robloxName) {
-            robloxName = donatorRaw.replace(/[^A-Za-z0-9_]/g, '').substring(0, 20);
+            // JANGAN return no name, pakai Unknown biar tetap masuk DB
+            robloxName = donatorRaw.replace(/[^A-Za-z0-9_]/g,'').substring(0,20) || "Unknown";
         }
-        if (!robloxName) return res.status(200).send("no name");
 
         const saweria_id = (body.id || `SAW_${Date.now()}_${Math.random()}`).toString();
 
